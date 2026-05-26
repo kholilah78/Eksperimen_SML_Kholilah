@@ -1,0 +1,79 @@
+name: Automated Preprocessing Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'heart.csv'
+      - 'preprocessing/automate_Kholilah-Nurafifah.py'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Alasan menjalankan workflow'
+        required: false
+        default: 'Manual trigger'
+
+jobs:
+  preprocessing:
+    name: Run Preprocessing Pipeline
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout repository ──────────────────────────
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Python ─────────────────────────────────
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12.7'
+          cache: 'pip'
+
+      # ── 3. Install dependencies ──────────────────────────
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas numpy scikit-learn
+
+      # ── 4. Create output directory ───────────────────────
+      - name: Create Output Directory
+        run: mkdir -p preprocessing/heart_preprocessing
+
+      # ── 5. Run preprocessing script ──────────────────────
+      - name: Run Automated Preprocessing
+        run: |
+          cd preprocessing
+          python automate_Kholilah-Nurafifah.py
+
+      # ── 6. Verify output files ───────────────────────────
+      - name: Verify Output
+        run: |
+          echo "=== Hasil Preprocessing ==="
+          ls -lh preprocessing/heart_preprocessing/
+          echo ""
+          echo "=== Preview heart_train.csv (5 baris) ==="
+          head -n 6 preprocessing/heart_preprocessing/heart_train.csv
+          echo ""
+          echo "=== Preview heart_test.csv (5 baris) ==="
+          head -n 6 preprocessing/heart_preprocessing/heart_test.csv
+
+      # ── 7. Upload preprocessed dataset as artifact ───────
+      - name: Upload Preprocessed Dataset
+        uses: actions/upload-artifact@v4
+        with:
+          name: heart_preprocessing_${{ github.run_number }}
+          path: preprocessing/heart_preprocessing/
+          retention-days: 30
+
+      # ── 8. Commit and push preprocessed data back ────────
+      - name: Commit Preprocessed Data
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add preprocessing/heart_preprocessing/
+          git diff --staged --quiet || git commit -m "chore: update preprocessed dataset [run #${{ github.run_number }}]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
